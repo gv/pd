@@ -275,7 +275,20 @@ proc init_for_platform {} {
             # frame's upper left corner. http://wiki.tcl.tk/11502
             set ::windowframex 3
             set ::windowframey 53
-			# TODO add wm iconphoto/iconbitmap here if it makes sense
+			# convert ../src/pd.ico[0] pd.gif && base64 pd.gif
+			image create photo pd_gif_icon -data "
+R0lGODlhMAAwAPMKAAAAAIAAAACAAAD/AICAAAAAgIAAgACAgICAgMDAwP///wAAAAAAAAAAAAAA
+AAAAACH5BAEAAAsALAAAAAAwADAAAAT+cMlJq7046807RmAohl5pAUIKrGsqAGYsCQORDkctIAMi
+x4IDoEdEHAQE2M+DEASK0MJu2UEAcjwoIumjbqw7be/V9WasWZ66JiybL2BegjhvAtzvSgIlBjnx
+eRNNg0U8O3eBcDsCBT1qd4OJFlYEWy+Xg4iSFAkBRywABi2QmxUhBZWDCAYkpYIgBAUjra4Us7S1
+EiErBKypt8DBIxiQIncJIcgIyMrNIMqwsiKeFwAKCQrZCsva3d7f2NrLCeTkINUgd3cF39fu7tjh
+8NuevYfnnNbt3fLuBwEs4mkLR/Caplfmbu3bA6qgw2zkDuqyZgVUQ4jvlK0gh/EdPGX+ppZVtMir
+X8aNHQWqlLhgT7aKBAPCQ4AqHQCOGVN2wgPi5YpuBVBuI4my4Lx4LK1AFMrw5tAVNplidJjgAB6X
+T0kSyMYCgbuARlVe22lqa1ZQBZD+FCdVYMYEU2yxeypCXlOMMMN+vCZLjz6GJrWxeAczZ1iytrYi
+g/pQgahjWbk9jBeRJ7uRUMER7Zpy6jZ8E1xivuPZIKiRXt2KRVMWIsfAb3G+Hng0oam54DqW9ni0
+dlICsHn3U9376JarkO7EAk57d07DY/ny3Gyy+vPJY/dMJ2r1l59bqayuEiEeDaAtqAp4AhggKIv2
+ANECUA8gwKX3vEiFNOJ9VnkR4YEQwMotA34gzIEIDpPLgrlEAAA7"
+			wm iconphoto . -default pd_gif_icon
         }
         "aqua" {
             set ::modifier "Mod1"
