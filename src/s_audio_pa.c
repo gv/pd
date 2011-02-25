@@ -76,8 +76,6 @@ static int pa_lowlevel_callback(const void *inputBuffer,
     int i; 
     unsigned int n, j;
     float *fbuf, *fp2, *fp3, *soundiop;
-    fprintf(stderr, ".");
-    fflush(stderr);
     if (pa_foo)
        fprintf(stderr, "pa_lowlevel_callback\n");
     if (nframes % DEFDACBLKSIZE)
@@ -123,6 +121,7 @@ PaError pa_open_callback(double sampleRate, int inchannels, int outchannels,
     long   bytesPerSample;
     PaError err;
     PaStreamParameters instreamparams, outstreamparams;
+    PaStreamParameters*p_instreamparams=0, *p_outstreamparams=0;
 
     if (indeviceno < 0) 
     {
@@ -149,10 +148,56 @@ PaError pa_open_callback(double sampleRate, int inchannels, int outchannels,
     outstreamparams.suggestedLatency = nbuffers*framesperbuf/sampleRate;
     outstreamparams.hostApiSpecificStreamInfo = 0;  /* ... MSP */
 
+    if(inchannels>0)
+        p_instreamparams=&instreamparams;
+    if(outchannels>0)
+        p_outstreamparams=&outstreamparams;
+
+    err=Pa_IsFormatSupported(p_instreamparams, p_outstreamparams, sampleRate);
+
+    if (paFormatIsSupported != err)
+    {
+        /* check whether we have to change the numbers of channel and/or samplerate */
+        const PaDeviceInfo* info = 0;
+        double inRate=0, outRate=0;
+
+        if (inchannels>0)
+        {
+            if (NULL != (info = Pa_GetDeviceInfo( instreamparams.device )))
+            {
+              inRate=info->defaultSampleRate;
+
+              if(info->maxInputChannels<inchannels)
+                instreamparams.channelCount=info->maxInputChannels;
+            }
+        }
+
+        if (outchannels>0)
+        {
+            if (NULL != (info = Pa_GetDeviceInfo( outstreamparams.device )))
+            {
+              outRate=info->defaultSampleRate;
+
+              if(info->maxOutputChannels<outchannels)
+                outstreamparams.channelCount=info->maxOutputChannels;
+            }
+        }
+
+        if (err == paInvalidSampleRate)
+        {
+            sampleRate=outRate;
+        }
+
+        err=Pa_IsFormatSupported(p_instreamparams, p_outstreamparams,
+            sampleRate);
+        if (paFormatIsSupported != err)
+        goto error;
+    }
+
     err = Pa_OpenStream(
               &pa_callbackstream,
-              (inchannels ? &instreamparams : 0),
-              (outchannels ? &outstreamparams : 0),
+              p_instreamparams,
+              p_outstreamparams,
               sampleRate,
               framesperbuf,
               paNoFlag,      /* portaudio will clip for us */
@@ -168,6 +213,7 @@ PaError pa_open_callback(double sampleRate, int inchannels, int outchannels,
         CloseAudioStream(pa_callbackstream);
         goto error;
     }
+    sys_dacsr=sampleRate;
     return paNoError;
 error:
     pa_callbackstream = NULL;
@@ -198,6 +244,9 @@ int pa_open_audio(int inchans, int outchans, int rate, t_sample *soundin,
             {
                 if (devno == indeviceno)
                 {
+                    if (inchans > info->maxInputChannels)
+                      inchans = info->maxInputChannels;
+
                     pa_indev = j;
                     break;
                 }
@@ -215,6 +264,9 @@ int pa_open_audio(int inchans, int outchans, int rate, t_sample *soundin,
             {
                 if (devno == outdeviceno)
                 {
+                    if (outchans > info->maxOutputChannels)
+                      outchans = info->maxOutputChannels;
+
                     pa_outdev = j;
                     break;
                 }
@@ -246,6 +298,28 @@ int pa_open_audio(int inchans, int outchans, int rate, t_sample *soundin,
         err = OpenAudioStream( &pa_stream, rate, paFloat32,
             inchans, outchans, framesperbuf, nbuffers,
                 pa_indev, pa_outdev);
+        if ( err == paInvalidSampleRate ) 
+        {
+          /* try again with the default samplerate... */
+          const PaDeviceInfo* info = 0;
+          int devno=pa_outdev;
+          if(devno<0)
+            devno=pa_indev;
+          if(devno<0)
+            devno=Pa_GetDefaultOutputDevice();
+
+          info=Pa_GetDeviceInfo( devno );
+          if(info)
+            rate=info->defaultSampleRate;
+
+          err = OpenAudioStream( &pa_stream, rate, paFloat32,
+                                 inchans, outchans, framesperbuf, nbuffers,
+                                 pa_indev, pa_outdev);
+
+          if ( paNoError == err ) 
+            sys_dacsr=rate;
+
+        }
     }
     if ( err != paNoError ) 
     {
@@ -266,8 +340,11 @@ void pa_close_audio( void)
     if (pa_stream)
         CloseAudioStream( pa_stream );
     pa_stream = 0;
-    if (pa_callbackstream)
-        CloseAudioStream(pa_callbackstream);
+    if (pa_callbackstream) {
+      //   CloseAudioStream(pa_callbackstream);
+      if(paNoError == Pa_StopStream( pa_callbackstream ))
+        Pa_CloseStream( pa_callbackstream );
+    }
     pa_callbackstream = 0;
     
 }

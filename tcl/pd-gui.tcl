@@ -64,6 +64,7 @@ namespace import ::pdtk_canvas::pdtk_canvas_editmode
 namespace import ::pdtk_canvas::pdtk_canvas_getscroll
 namespace import ::pdtk_canvas::pdtk_canvas_setparents
 namespace import ::pdtk_canvas::pdtk_canvas_reflecttitle
+namespace import ::pdtk_canvas::pdtk_canvas_menuclose
 namespace import ::dialog_array::pdtk_array_dialog
 namespace import ::dialog_audio::pdtk_audio_dialog
 namespace import ::dialog_canvas::pdtk_canvas_dialog
@@ -95,6 +96,7 @@ set PD_MAJOR_VERSION 0
 set PD_MINOR_VERSION 0
 set PD_BUGFIX_VERSION 0
 set PD_TEST_VERSION ""
+set done_init 0
 
 set TCL_MAJOR_VERSION 0
 set TCL_MINOR_VERSION 0
@@ -117,24 +119,29 @@ set font_weight "normal"
 # sizes of chars for each of the Pd fixed font sizes:
 #  fontsize  width(pixels)  height(pixels)
 set font_fixed_metrics {
-    8 5 10
-    9 6 11
+    8 5 11
+    9 6 12
     10 6 13
-    12 7 15
+    12 7 16
     14 8 17
-    16 10 20
+    16 10 19
     18 11 22
-    24 14 30
+    24 14 29
     30 18 37
-    36 22 45
+    36 22 44
 }
+set font_measured_metrics {}
 
 # root path to lib of Pd's files, see s_main.c for more info
 set sys_libdir {}
 # root path where the pd-gui.tcl GUI script is located
 set sys_guidir {}
-# path to search for objects, help, fonts, etc.
-set pd_path {}
+# user-specified search path for objects, help, fonts, etc.
+set sys_searchpath {}
+# hard-coded search patch for objects, help, plugins, etc.
+set sys_staticpath {}
+# the path to the folder where the current plugin is being loaded from
+set current_plugin_loadpath {}
 # list of command line flags set at startup
 set startup_flags {}
 # list of libraries loaded on startup
@@ -275,6 +282,7 @@ proc init_for_platform {} {
             # frame's upper left corner. http://wiki.tcl.tk/11502
             set ::windowframex 3
             set ::windowframey 53
+
 			# convert ../src/pd.ico[0] pd.gif && base64 pd.gif
 			image create photo pd_gif_icon -data "
 R0lGODlhMAAwAPMKAAAAAIAAAACAAAD/AICAAAAAgIAAgACAgICAgMDAwP///wAAAAAAAAAAAAAA
@@ -289,6 +297,14 @@ g/pQgahjWbk9jBeRJ7uRUMER7Zpy6jZ8E1xivuPZIKiRXt2KRVMWIsfAb3G+Hng0oam54DqW9ni0
 dlICsHn3U9376JarkO7EAk57d07DY/ny3Gyy+vPJY/dMJ2r1l59bqayuEiEeDaAtqAp4AhggKIv2
 ANECUA8gwKX3vEiFNOJ9VnkR4YEQwMotA34gzIEIDpPLgrlEAAA7"
 			wm iconphoto . -default pd_gif_icon
+
+            set ::cursor_runmode_nothing "left_ptr"
+            set ::cursor_runmode_clickme "arrow"
+            set ::cursor_runmode_thicken "sb_v_double_arrow"
+            set ::cursor_runmode_addpoint "plus"
+            set ::cursor_editmode_nothing "hand2"
+            set ::cursor_editmode_connect "circle"
+            set ::cursor_editmode_disconnect "X_cursor"
         }
         "aqua" {
             set ::modifier "Mod1"
@@ -313,6 +329,14 @@ ANECUA8gwKX3vEiFNOJ9VnkR4YEQwMotA34gzIEIDpPLgrlEAAA7"
             # left corner (not of the window frame) http://wiki.tcl.tk/11502
             set ::windowframex 0
             set ::windowframey 0
+            # mouse cursors for all the different modes
+            set ::cursor_runmode_nothing "arrow"
+            set ::cursor_runmode_clickme "center_ptr"
+            set ::cursor_runmode_thicken "sb_v_double_arrow"
+            set ::cursor_runmode_addpoint "plus"
+            set ::cursor_editmode_nothing "hand2"
+            set ::cursor_editmode_connect "circle"
+            set ::cursor_editmode_disconnect "X_cursor"
         }
         "win32" {
             set ::modifier "Control"
@@ -342,6 +366,14 @@ ANECUA8gwKX3vEiFNOJ9VnkR4YEQwMotA34gzIEIDpPLgrlEAAA7"
             set ::windowframey 0
             # TODO use 'winico' package for full, hicolor icon support
             wm iconbitmap . -default [file join $::sys_guidir pd.ico]
+            # mouse cursors for all the different modes
+            set ::cursor_runmode_nothing "rigth_ptr"
+            set ::cursor_runmode_clickme "arrow"
+            set ::cursor_runmode_thicken "sb_v_double_arrow"
+            set ::cursor_runmode_addpoint "plus"
+            set ::cursor_editmode_nothing "hand2"
+            set ::cursor_editmode_connect "circle"
+            set ::cursor_editmode_disconnect "X_cursor"
         }
     }
 }
@@ -397,8 +429,8 @@ proc get_font_for_size {size} {
 # always do a good job of choosing in respect to Pd's needs.  So this chooses
 # from a list of fonts that are known to work well with Pd.
 proc find_default_font {} {
-    set testfonts {"Inconsolata" "Courier New" "Liberation Mono" "FreeMono" \
-                       "DejaVu Sans Mono" "Bitstream Vera Sans Mono"}
+    set testfonts {"DejaVu Sans Mono" "Bitstream Vera Sans Mono" \
+        "Inconsolata" "Courier 10 Pitch" "Andale Mono" "Droid Sans Mono"}
     foreach family $testfonts {
         if {[lsearch -exact -nocase [font families] $family] > -1} {
             set ::font_family $family
@@ -436,14 +468,19 @@ proc fit_font_into_metrics {} {
             -size [expr {-$height}]
         set height2 $height
         set giveup 0
-        while {[font measure $myfont M] > $width} {
+        while {[font measure $myfont M] > $width || \
+            [font metrics $myfont -linespace] > $height} {
             incr height2 -1
             font configure $myfont -size [expr {-$height2}]
             if {$height2 * 2 <= $height} {
                 set giveup 1
+                set ::font_measured_metrics $::font_fixed_metrics
                 break
             }
         }
+        set ::font_measured_metrics \
+            "$::font_measured_metrics  $size\
+                [font measure $myfont M] [font metrics $myfont -linespace]"
         if {$giveup} {
             ::pdwindow::warn [format \
     [_ "WARNING: %s failed to find font size (%s) that fits into %sx%s!\n"]\
@@ -464,12 +501,12 @@ proc pdtk_pd_startup {major minor bugfix test
     set ::PD_BUGFIX_VERSION $bugfix
     set ::PD_TEST_VERSION $test
     set oldtclversion 0
-    pdsend "pd init [enquote_path [pwd]] $oldtclversion $::font_fixed_metrics"
     set ::audio_apilist $audio_apis
     set ::midi_apilist $midi_apis
     if {$::tcl_version >= 8.5} {find_default_font}
     set_base_font $sys_font $sys_fontweight
     fit_font_into_metrics
+    pdsend "pd init [enquote_path [pwd]] $oldtclversion $::font_measured_metrics"
     ::pd_bindings::class_bindings
     ::pd_bindings::global_bindings
     ::pd_menus::create_menubar
@@ -478,12 +515,13 @@ proc pdtk_pd_startup {major minor bugfix test
     ::pd_menus::configure_for_pdwindow
     load_startup_plugins
     open_filestoopen
+    set ::done_init 1
 }
 
 ##### routine to ask user if OK and, if so, send a message on to Pd ######
 proc pdtk_check {mytoplevel message reply_to_pd default} {
     wm deiconify $mytoplevel
-   raise $mytoplevel
+    raise $mytoplevel
     if {$::windowingsystem eq "win32"} {
         set answer [tk_messageBox -message [_ $message] -type yesno -default $default \
                         -icon question -title [wm title $mytoplevel]]
@@ -624,10 +662,12 @@ proc load_plugin_script {filename} {
 }
 
 proc load_startup_plugins {} {
-    foreach pathdir [concat $::pd_path [file join $::sys_libdir startup]] {
+    foreach pathdir [concat $::sys_searchpath $::sys_staticpath] {
         set dir [file normalize $pathdir]
         if { ! [file isdirectory $dir]} {continue}
-        foreach filename [glob -directory $dir -nocomplain -types {f} -- *-plugin.tcl] {
+        foreach filename [glob -directory $dir -nocomplain -types {f} -- \
+                              *-plugin/*-plugin.tcl *-plugin.tcl] {
+            set ::current_plugin_loadpath [file dirname $filename]
             load_plugin_script $filename
         }
     }

@@ -2,6 +2,7 @@ package provide dialog_midi 0.1
 
 namespace eval ::dialog_midi:: {
     namespace export pdtk_midi_dialog
+    namespace export pdtk_alsa_midi_dialog
 }
 
 # TODO this panel really needs some reworking, it works but the code is
@@ -171,7 +172,7 @@ proc ::dialog_midi::pdtk_midi_dialog {id indev1 indev2 indev3 indev4 \
     }
 
         # output device 3
-    if {$longform && [llength $midi_midi_outdevlist] > 3} {
+    if {$longform && [llength $midi_outdevlist] > 3} {
         frame $id.out3f
         pack $id.out3f -side top
         label $id.out3f.l1 -text [_ "Output device 3:"]
@@ -182,7 +183,7 @@ proc ::dialog_midi::pdtk_midi_dialog {id indev1 indev2 indev3 indev4 \
     }
 
         # output device 4
-    if {$longform && [llength $midi_midi_outdevlist] > 4} {
+    if {$longform && [llength $midi_outdevlist] > 4} {
         frame $id.out4f
         pack $id.out4f -side top
         label $id.out4f.l1 -text [_ "Output device 4:"]
