@@ -9,6 +9,7 @@ namespace eval ::pdtk_canvas:: {
     namespace export pdtk_canvas_getscroll
     namespace export pdtk_canvas_setparents
     namespace export pdtk_canvas_reflecttitle
+    namespace export pdtk_canvas_menuclose
 }
 
 # One thing that is tricky to understand is the difference between a Tk
@@ -51,11 +52,18 @@ proc pdtk_canvas_new {mytoplevel width height geometry editable} {
     }
     set geometry ${width}x$height+$x+$y
 
+    # release the window grab here so that the new window will
+    # properly get the Map and FocusIn events when its created
+    ::pdwindow::busyrelease
+    # set the loaded array for this new window so things can track state
     set ::loaded($mytoplevel) 0
     toplevel $mytoplevel -width $width -height $height -class PatchWindow
     wm group $mytoplevel .
     $mytoplevel configure -menu $::patch_menubar
 
+    # we have to wait until $mytoplevel exists before we can generate
+    # a <<Loading>> event for it, that's why this is here and not in the
+    # started_loading_file proc.  Perhaps this doesn't make sense tho
     event generate $mytoplevel <<Loading>>
 
     wm geometry $mytoplevel $geometry
@@ -119,6 +127,29 @@ proc pdtk_canvas_saveas {name initialfile initialdir} {
     set basename [file tail $filename]
     pdsend "$name savetofile [enquote_path $basename] [enquote_path $dirname]"
     set ::filenewdir $dirname
+}
+
+##### ask user Save? Discard? Cancel?, and if so, send a message on to Pd ######
+proc ::pdtk_canvas::pdtk_canvas_menuclose {mytoplevel reply_to_pd} {
+    raise $mytoplevel
+    set filename [wm title $mytoplevel]
+    set message [format {Do you want to save the changes you made in "%s"?} $filename]
+    set answer [tk_messageBox -message $message -type yesnocancel -default "yes" \
+                    -parent $mytoplevel -icon question]
+    switch -- $answer {
+        yes { 
+            pdsend "$mytoplevel menusave"
+            if {[regexp {Untitled-[0-9]+} $filename]} {
+                # wait until pdtk_canvas_saveas finishes and writes to
+                # this var, otherwise the close command will be sent
+                # immediately and the file won't get saved
+                vwait ::filenewdir
+            }
+            pdsend $reply_to_pd
+        }
+        no {pdsend $reply_to_pd}
+        cancel {}
+    }
 }
 
 #------------------------------------------------------------------------------#
@@ -207,19 +238,16 @@ proc ::pdtk_canvas::pdtk_canvas_popup {mytoplevel xcanvas ycanvas hasproperties 
 # procs for when file loading starts/finishes
 
 proc ::pdtk_canvas::started_loading_file {patchname} {
-    # set the mouse cursor to look busy and grab focus so it stays that way    
-    .pdwindow.text configure -cursor watch
-    grab set .pdwindow.text
+    ::pdwindow::busygrab
 }
 
+# things to run when a patch is finished loading.  This is called when
+# the OS sends the "Map" event for this window.
 proc ::pdtk_canvas::finished_loading_file {mytoplevel} {
-    .pdwindow.text configure -cursor xterm
-    grab release .pdwindow.text
-
-    # The grab seems to block the new PatchWindow from getting the FocusIn
-    # event, so generate it after loading a patch.  Then it indeed is on top,
-    # the mouse pointer is set, and the PatchWindow gets the focus.
-    event generate $mytoplevel <FocusIn>
+    # ::pdwindow::busyrelease is in pdtk_canvas_new so that the grab
+    # is released before the new toplevel window gets created.
+    # Otherwise the grab blocks the new window from getting the
+    # FocusIn event on creation.
 
     # set editmode to make sure the menu item is in the right state
     pdtk_canvas_editmode $mytoplevel $::editmode($mytoplevel)
@@ -255,20 +283,11 @@ proc pdtk_undomenu {mytoplevel undoaction redoaction} {
     }
 }
 
-# This proc gets both mytoplevel and tkcanvas windows sent to it.  When a
-# canvas has completed loading, then tkcanvas is sent to this proc, so we can
-# use that as a test for whether the canvas has completed loading.  Otherwise,
-# we just use mytoplevel for the scrolling.
-proc ::pdtk_canvas::pdtk_canvas_getscroll {window} {
-    set mytoplevel [winfo toplevel $window]    
-    # if we received the name of a canvas, then set ::loaded.  This
-    # is the current way to test whether the patch is done loading.
-    if {$mytoplevel ne $window} {
-        if {! $::loaded($mytoplevel)} {
-            finished_loading_file $mytoplevel
-        }
-    }
-    set tkcanvas [tkcanvas_name $mytoplevel]
+# This proc configures the scrollbars whenever anything relevant has
+# been updated.  It should always receive a tkcanvas, which is then
+# used to generate the mytoplevel, needed to address the scrollbars.
+proc ::pdtk_canvas::pdtk_canvas_getscroll {tkcanvas} {
+    set mytoplevel [winfo toplevel $tkcanvas]    
     set bbox [$tkcanvas bbox all]
     if {$bbox eq "" || [llength $bbox] != 4} {return}
     set xupperleft [lindex $bbox 0]
@@ -330,8 +349,12 @@ proc ::pdtk_canvas::pdtk_canvas_reflecttitle {mytoplevel \
                                               path name arguments dirty} {
     set ::windowname($mytoplevel) $name ;# TODO add path to this
     if {$::windowingsystem eq "aqua"} {
+        wm attributes $mytoplevel -modified $dirty
         if {[file exists "$path/$name"]} {
-            wm attributes $mytoplevel -modified $dirty -titlepath "$path/$name"
+            # for some reason -titlepath can still fail so just catch it 
+            if [catch {wm attributes $mytoplevel -titlepath "$path/$name"}] {
+                wm title $mytoplevel "$path/$name"
+            }
         }
         wm title $mytoplevel "$name$arguments"
     } else {

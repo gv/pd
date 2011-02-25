@@ -75,12 +75,17 @@ extern int sys_blocksize;       /* audio I/O block size in sample frames */
 extern t_float sys_dacsr;
 extern int sys_schedadvance;
 extern int sys_sleepgrain;
-void sys_set_audio_settings(int naudioindev, int *audioindev,
+EXTERN void sys_set_audio_settings(int naudioindev, int *audioindev,
     int nchindev, int *chindev,
     int naudiooutdev, int *audiooutdev, int nchoutdev, int *choutdev,
     int srate, int advance, int callback);
-void sys_reopen_audio( void);
-void sys_close_audio(void);
+/* the same as above, but reopens the audio subsystem if needed */
+EXTERN void sys_set_audio_settings_reopen(int naudioindev, int *audioindev,
+    int nchindev, int *chindev,
+    int naudiooutdev, int *audiooutdev, int nchoutdev, int *choutdev,
+    int srate, int advance, int callback);
+EXTERN void sys_reopen_audio( void);
+EXTERN void sys_close_audio(void);
 
 
 int sys_send_dacs(void);
@@ -91,23 +96,32 @@ void sys_getmeters(t_sample *inmax, t_sample *outmax);
 void sys_listdevs(void);
 void sys_setblocksize(int n);
 
+EXTERN void sys_get_audio_devs(char *indevlist, int *nindevs,
+                          char *outdevlist, int *noutdevs, int *canmulti, int *cancallback, 
+                          int maxndev, int devdescsize);
+EXTERN void sys_get_audio_apis(char *buf);
+
 /* s_midi.c */
 #define MAXMIDIINDEV 16         /* max. number of input ports */
 #define MAXMIDIOUTDEV 16        /* max. number of output ports */
+extern int sys_midiapi;
 extern int sys_nmidiin;
 extern int sys_nmidiout;
 extern int sys_midiindevlist[];
 extern int sys_midioutdevlist[];
 
-void sys_open_midi(int nmidiin, int *midiinvec,
+EXTERN void sys_open_midi(int nmidiin, int *midiinvec,
     int nmidiout, int *midioutvec, int enable);
-void sys_get_midi_params(int *pnmidiindev, int *pmidiindev,
+
+EXTERN void sys_get_midi_apis(char *buf);
+EXTERN void sys_get_midi_devs(char *indevlist, int *nindevs,
+    char *outdevlist, int *noutdevs, 
+   int maxndev, int devdescsize);
+EXTERN void sys_get_midi_params(int *pnmidiindev, int *pmidiindev,
     int *pnmidioutdev, int *pmidioutdev);
 
-void sys_get_midi_apis(char *buf);
-
-void sys_reopen_midi( void);
-void sys_close_midi( void);
+EXTERN void sys_reopen_midi( void);
+EXTERN void sys_close_midi( void);
 EXTERN void sys_putmidimess(int portno, int a, int b, int c);
 EXTERN void sys_putmidibyte(int portno, int a);
 EXTERN void sys_poll_midi(void);
@@ -184,7 +198,12 @@ void sys_setalarm(int microsec);
 #define API_SGI 6
 #define API_AUDIOUNIT 7
 #define API_ESD 8
+#define API_DUMMY 9
 
+#ifdef USEAPI_DUMMY
+#define API_DEFAULT API_DUMMY
+#define API_DEFSTRING "dummy audio"
+#else
 #if defined(__linux__) || defined(__FreeBSD_kernel__)
 # define API_DEFAULT API_OSS
 # define API_DEFSTRING "OSS"
@@ -210,6 +229,8 @@ void sys_setalarm(int microsec);
 # define API_DEFAULT API_JACK
 # define API_DEFSTRING "Jack audio connection kit"
 #endif
+#endif
+
 #define DEFAULTAUDIODEV 0
 
 #define MAXAUDIOINDEV 4
@@ -298,17 +319,16 @@ void esd_getdevs(char *indevlist, int *nindevs,
         int maxndev, int devdescsize);
 
 void sys_listmididevs(void);
-void sys_set_midi_api(int whichapi);
-void sys_set_audio_api(int whichapi);
-void sys_get_audio_apis(char *buf);
+EXTERN void sys_set_midi_api(int whichapi);
+EXTERN void sys_set_audio_api(int whichapi);
 extern int sys_audioapi;
-void sys_set_audio_state(int onoff);
+EXTERN void sys_set_audio_state(int onoff);
 
 /* API dependent audio flags and settings */
 void oss_set32bit( void);
 void linux_alsa_devname(char *devname);
 
-void sys_get_audio_params(
+EXTERN void sys_get_audio_params(
     int *pnaudioindev, int *paudioindev, int *chindev,
     int *pnaudiooutdev, int *paudiooutdev, int *choutdev,
     int *prate, int *padvance, int *callback);

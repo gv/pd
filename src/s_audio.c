@@ -372,6 +372,11 @@ void sys_close_audio(void)
         esd_close_audio();
     else
 #endif
+#ifdef USEAPI_DUMMY
+    if (sys_audioapiopened == API_DUMMY)
+        dummy_close_audio();
+    else
+#endif
         post("sys_close_audio: unknown API %d", sys_audioapiopened);
     sys_inchannels = sys_outchannels = 0;
     sys_audioapiopened = -1;
@@ -449,6 +454,12 @@ void sys_reopen_audio( void)
         outcome = esd_open_audio(naudioindev, audioindev, naudioindev,
             chindev, naudiooutdev, audiooutdev, naudiooutdev, choutdev, rate);
     else 
+#endif
+#ifdef USEAPI_DUMMY
+    if (sys_audioapi == API_DUMMY)
+        outcome = dummy_open_audio(naudioindev, audioindev, naudioindev,
+            chindev, naudiooutdev, audiooutdev, naudiooutdev, choutdev, rate);
+    else
 #endif
     if (sys_audioapi == API_NONE)
         ;
@@ -529,6 +540,11 @@ int sys_send_dacs(void)
 #ifdef USEAPI_ESD
     if (sys_audioapi == API_ESD)
         return (esd_send_dacs());
+    else
+#endif
+#ifdef USEAPI_DUMMY
+    if (sys_audioapi == API_DUMMY)
+        return (dummy_send_dacs());
     else
 #endif
     post("unknown API");    
@@ -625,6 +641,14 @@ static void audio_getdevs(char *indevlist, int *nindevs,
     if (sys_audioapi == API_ESD)
     {
         esd_getdevs(indevlist, nindevs, outdevlist, noutdevs, canmulti,
+            maxndev, devdescsize);
+    }
+    else
+#endif
+#ifdef USEAPI_DUMMY
+    if (sys_audioapi == API_DUMMY)
+    {
+        dummy_getdevs(indevlist, nindevs, outdevlist, noutdevs, canmulti,
             maxndev, devdescsize);
     }
     else
@@ -791,14 +815,23 @@ void glob_audio_dialog(t_pd *dummy, t_symbol *s, int argc, t_atom *argv)
         }
     }
     
-    if (newcallback < 0)
-        newcallback = 0;
-    if (!audio_callback_is_open && !newcallback)
-        sys_close_audio();
-    sys_set_audio_settings(nindev, newaudioindev, nindev, newaudioinchan,
+    sys_set_audio_settings_reopen(nindev, newaudioindev, nindev, newaudioinchan,
         noutdev, newaudiooutdev, noutdev, newaudiooutchan,
-        newrate, newadvance, (newcallback >= 0 ? newcallback : 0));
-    if (!audio_callback_is_open && !newcallback)
+        newrate, newadvance, newcallback);
+}
+
+void sys_set_audio_settings_reopen(int naudioindev, int *audioindev, int nchindev,
+    int *chindev, int naudiooutdev, int *audiooutdev, int nchoutdev,
+    int *choutdev, int rate, int advance, int callback)
+{
+    if (callback < 0)
+        callback = 0;
+    if (!audio_callback_is_open && !callback)
+        sys_close_audio();
+    sys_set_audio_settings(naudioindev, audioindev, nchindev, chindev,
+        naudiooutdev, audiooutdev, nchoutdev, choutdev,
+        rate, advance, (callback >= 0 ? callback : 0));
+    if (!audio_callback_is_open && !callback)
         sys_reopen_audio();
     else sched_reopenmeplease();
 }
@@ -840,9 +873,24 @@ void sys_listdevs(void )
         sys_listaudiodevs();
     else
 #endif
+#ifdef USEAPI_DUMMY
+    if (sys_audioapi == API_DUMMY)
+        sys_listaudiodevs();
+    else
+#endif
     post("unknown API");    
 
     sys_listmididevs();
+}
+
+void sys_get_audio_devs(char *indevlist, int *nindevs,
+    char *outdevlist, int *noutdevs, int *canmulti, int *cancallback, 
+                        int maxndev, int devdescsize)
+{
+  audio_getdevs(indevlist, nindevs,
+                outdevlist, noutdevs, 
+                canmulti, cancallback, 
+                maxndev, devdescsize);
 }
 
 void sys_setblocksize(int n)
@@ -940,6 +988,9 @@ void sys_get_audio_apis(char *buf)
 #endif
 #ifdef USEAPI_ESD
     sprintf(buf + strlen(buf), "{ESD %d} ", API_ESD); n++;
+#endif
+#ifdef USEAPI_DUMMY
+    sprintf(buf + strlen(buf), "{dummy %d} ", API_DUMMY); n++;
 #endif
     strcat(buf, "}");
         /* then again, if only one API (or none) we don't offer any choice. */
