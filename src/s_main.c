@@ -25,7 +25,11 @@
 #define snprintf sprintf_s
 #endif
 
-char *pd_version;
+       
+#define stringify(s) str(s)
+#define str(s) #s
+ 
+char *pd_version = "Pd-" stringify(PD_MAJOR_VERSION) "." stringify(PD_MINOR_VERSION) "." stringify(PD_BUGFIX_VERSION) " (" stringify(PD_TEST_VERSION) ")";
 char pd_compiletime[] = __TIME__;
 char pd_compiledate[] = __DATE__;
 
@@ -63,10 +67,10 @@ int sys_midioutdevlist[MAXMIDIOUTDEV] = {1};
 
 #ifdef __APPLE__
 char sys_font[100] = "Monaco";
-char sys_fontweight[] = "normal";
+char sys_fontweight[10] = "normal";
 #else
 char sys_font[100] = "Courier";
-char sys_fontweight[] = "bold";
+char sys_fontweight[10] = "bold";
 #endif
 static int sys_main_srate;
 static int sys_main_advance;
@@ -281,7 +285,7 @@ int sys_main(int argc, char **argv)
     if (sys_argparse(argc-1, argv+1))           /* parse cmd line */
         return (1);
     sys_afterargparse();                    /* post-argparse settings */
-    if (sys_verbose || sys_version) fprintf(stderr, "%scompiled %s %s\n",
+    if (sys_verbose || sys_version) fprintf(stderr, "%s compiled %s %s\n",
         pd_version, pd_compiletime, pd_compiledate);
     if (sys_version)    /* if we were just asked our version, exit here. */
         return (0);

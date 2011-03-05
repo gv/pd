@@ -176,7 +176,7 @@ proc ::pd_bindings::patch_configure {mytoplevel width height x y} {
     # for some reason, when we create a window, we get an event with a
     # widthXheight of 1x1 first, then we get the right values, so filter it out
     if {$width == 1 && $height == 1} {return}
-    pdtk_canvas_getscroll $mytoplevel
+    pdtk_canvas_getscroll [tkcanvas_name $mytoplevel]
     # send the size/location of the window and canvas to 'pd' in the form of:
     #    left top right bottom
     pdsend "$mytoplevel setbounds $x $y [expr $x + $width] [expr $y + $height]"
@@ -207,6 +207,10 @@ proc ::pd_bindings::window_focusin {mytoplevel} {
         ::pd_menus::configure_for_canvas $mytoplevel
     }
     if {[winfo exists .font]} {wm transient .font $::focused_window}
+    # if we regain focus from another app, make sure to editmode cursor is right
+    if {$::editmode($mytoplevel)} {
+        $mytoplevel configure -cursor hand2
+    }
     # TODO handle enabling/disabling the Cut/Copy/Paste menu items in Edit
 }
 
@@ -223,6 +227,7 @@ proc ::pd_bindings::dialog_focusin {mytoplevel} {
 # don't get a final "unmap" event when we destroy the window.
 proc ::pd_bindings::map {mytoplevel} {
     pdsend "$mytoplevel map 1"
+    ::pdtk_canvas::finished_loading_file $mytoplevel
 }
 
 proc ::pd_bindings::unmap {mytoplevel} {
@@ -251,6 +256,9 @@ proc ::pd_bindings::sendkey {window state key iso shift} {
     if {$iso ne ""} {
         scan $iso %c key
     }
+    # some pop-up panels also bind to keys like the enter, but then disappear,
+    # so ignore their events.  The inputbox in the Startup dialog does this.
+    if {! [winfo exists $window]} {return}
     #$window might be a toplevel or canvas, [winfo toplevel] does the right thing
     set mytoplevel [winfo toplevel $window]
     if {[winfo class $mytoplevel] eq "PatchWindow"} {

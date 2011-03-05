@@ -11,7 +11,7 @@ extern "C" {
 #define PD_MAJOR_VERSION 0
 #define PD_MINOR_VERSION 43
 #define PD_BUGFIX_VERSION 0
-#define PD_TEST_VERSION "test1"
+#define PD_TEST_VERSION "test4"
 
 /* old name for "MSW" flag -- we have to take it for the sake of many old
 "nmakefiles" for externs, which will define NT and not MSW */
@@ -587,7 +587,6 @@ EXTERN_STRUCT _garray;
 EXTERN t_class *garray_class;
 EXTERN int garray_getfloatarray(t_garray *x, int *size, t_float **vec);
 EXTERN int garray_getfloatwords(t_garray *x, int *size, t_word **vec);
-EXTERN t_float garray_get(t_garray *x, t_symbol *s, t_int indx);
 EXTERN void garray_redraw(t_garray *x);
 EXTERN int garray_npoints(t_garray *x);
 EXTERN char *garray_vec(t_garray *x);

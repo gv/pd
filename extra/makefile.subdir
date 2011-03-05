@@ -2,8 +2,7 @@
 prefix = /usr/local
 libpddir = $(prefix)/lib/pd
 
-EXTERNALS=bonk~ choice expr~ fiddle~ loop~ lrshift~ pd~ pique sigmund~ stdout
-.PHONY: $(EXTERNALS)
+.PHONY: 
 
 current: pd_linux
 
@@ -13,7 +12,8 @@ pd_nt: $(NAME).dll
 
 .SUFFIXES: .dll
 
-PDNTCFLAGS = /W3 /WX /DNT /DPD /nologo -D_CRT_SECURE_NO_WARNINGS
+PDNTCFLAGS = /W3 /WX /DNT /DPD /nologo -D_CRT_SECURE_NO_WARNINGS \
+    -D_CRT_NONSTDC_NO_DEPRECATE
 # VC="C:\Program Files\Microsoft Visual Studio\Vc98"
 VC = "C:\Program Files\Microsoft Visual Studio 9.0\VC"
 VSTK = "C:\Program Files\Microsoft SDKs\Windows\v6.0A"
@@ -76,23 +76,7 @@ distclean clean: clean-externals
 # ----------------------------------------------------------
 # ----------------------------------------------------------
 
-$(EXTERNALS): 
-	if test -d $@; then make -C $@; fi
-
-$(EXTERNALS:%=%-clean): 
-	if test -d $(@:-clean=); then make -C $(@:-clean=) clean; fi
-
-$(EXTERNALS:%=%-install): 
-	if test -d $(@:-install=); then make -C $(@:-install=) install; fi
-
-all: $(EXTERNALS)
-
-clean-externals: $(EXTERNALS:%=%-clean)
-
-install: $(EXTERNALS:%=%-install)
+install: 
 	install -d $(DESTDIR)$(libpddir)/extra/$(NAME)
 	install -m644 -p *.*_* $(DESTDIR)$(libpddir)/extra/$(NAME)
 	install -m644 -p *.pd $(DESTDIR)$(libpddir)/extra/$(NAME)
-
-test:
-	@echo prefix: $(prefix)

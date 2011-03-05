@@ -8,6 +8,7 @@
 #include "m_imp.h"
 #include "s_stuff.h"
 #include "g_canvas.h"
+#include "s_utf8.h" /*-- moo --*/
 #include <string.h>
 #ifdef _MSC_VER  /* This is only for Microsoft's compiler, not cygwin, e.g. */
 #define snprintf sprintf_s
@@ -69,7 +70,8 @@ int gobj_shouldvis(t_gobj *x, struct _glist *glist)
 {
     t_object *ob;
     if (!glist->gl_havewindow && glist->gl_isgraph && glist->gl_goprect &&
-        glist->gl_owner && (pd_class(&glist->gl_pd) != garray_class))
+        glist->gl_owner && (pd_class(&x->g_pd) != scalar_class)
+            && (pd_class(&x->g_pd) != garray_class))
     {
         /* if we're graphing-on-parent and the object falls outside the
         graph rectangle, don't draw it. */
@@ -716,7 +718,7 @@ static void glist_doreload(t_glist *gl, t_symbol *name, t_symbol *dir,
 {
     t_gobj *g;
     int i, nobj = glist_getindex(gl, 0);  /* number of objects */
-    int hadwindow = gl->gl_havewindow;
+    int hadwindow = (gl->gl_editor != 0);
     for (g = gl->gl_list, i = 0; g && i < nobj; i++)
     {
         if (g != except && pd_class(&g->g_pd) == canvas_class &&
@@ -729,8 +731,10 @@ static void glist_doreload(t_glist *gl, t_symbol *name, t_symbol *dir,
                 replacement will be at the end of the list, so we don't
                 do g = g->g_next in this case. */
             int j = glist_getindex(gl, g);
-            if (!gl->gl_havewindow)
-                canvas_vis(glist_getcanvas(gl), 1);
+            if (!gl->gl_editor)
+                canvas_vis(gl, 1);
+            if (!gl->gl_editor)
+                bug("editor");
             glist_noselect(gl);
             glist_select(gl, g);
             canvas_setundo(gl, canvas_undo_cut,
@@ -747,7 +751,7 @@ static void glist_doreload(t_glist *gl, t_symbol *name, t_symbol *dir,
              g = g->g_next;
         }
     }
-    if (!hadwindow && gl->gl_havewindow)
+    if (!hadwindow && gl->gl_editor)
         canvas_vis(glist_getcanvas(gl), 0);
 }
 
@@ -771,17 +775,13 @@ void canvas_reload(t_symbol *name, t_symbol *dir, t_gobj *except)
 /* ------------------------ event handling ------------------------ */
 
 static char *cursorlist[] = {
-#ifdef MSW
-    "right_ptr",        /* CURSOR_RUNMODE_NOTHING */
-#else
-    "left_ptr",         /* CURSOR_RUNMODE_NOTHING */
-#endif
-    "arrow",            /* CURSOR_RUNMODE_CLICKME */
-    "sb_v_double_arrow", /* CURSOR_RUNMODE_THICKEN */
-    "plus",             /* CURSOR_RUNMODE_ADDPOINT */
-    "hand2",            /* CURSOR_EDITMODE_NOTHING */
-    "circle",           /* CURSOR_EDITMODE_CONNECT */
-    "X_cursor"          /* CURSOR_EDITMODE_DISCONNECT */
+    "$cursor_runmode_nothing",
+    "$cursor_runmode_clickme",
+    "$cursor_runmode_thicken",
+    "$cursor_runmode_addpoint",
+    "$cursor_editmode_nothing",
+    "$cursor_editmode_connect",
+    "$cursor_editmode_disconnect"
 };
 
 void canvas_setcursor(t_canvas *x, unsigned int cursornum)
@@ -924,9 +924,6 @@ void canvas_vis(t_canvas *x, t_floatarg f)
 {
     char buf[30];
     int flag = (f != 0);
-    /* why is this here, what's the problem? This gets triggered by GOPs */
-    if (x != glist_getcanvas(x))
-        bug("canvas_vis");
     if (flag)
     {
         /* If a subpatch/abstraction has GOP/gl_isgraph set, then it will have
@@ -1032,16 +1029,7 @@ void canvas_setgraph(t_glist *x, int flag, int nogoprect)
             gobj_vis(&x->gl_gobj, x->gl_owner, 0);
         x->gl_isgraph = 1;
         x->gl_hidetext = !(!(flag&2));
-        if (!nogoprect && !x->gl_goprect)
-        {
-            t_gobj *g;
-            for (g = x->gl_list; g; g = g->g_next)
-                if (pd_checkobject(&g->g_pd))
-            {
-                x->gl_goprect = 1;
-                break;
-            }
-        }
+        x->gl_goprect = !nogoprect;
         if (glist_isvisible(x) && x->gl_goprect)
             glist_redraw(x);
         if (x->gl_owner && !x->gl_loading && glist_isvisible(x->gl_owner))
@@ -1623,8 +1611,6 @@ void canvas_mouseup(t_canvas *x,
             gobj_activate(x->gl_editor->e_selection->sel_what, x, 1);
         }
     }
-    if (x->gl_editor->e_onmotion != MA_NONE)
-        sys_vgui("pdtk_canvas_getscroll .x%lx.c\n", x);
 
     x->gl_editor->e_onmotion = MA_NONE;
 }
@@ -1649,6 +1635,7 @@ static void canvas_displaceselection(t_canvas *x, int dx, int dy)
     }
     if (resortin) canvas_resortinlets(x);
     if (resortout) canvas_resortoutlets(x);
+    sys_vgui("pdtk_canvas_getscroll .x%lx.c\n", x);
     if (x->gl_editor->e_selection)
         canvas_dirty(x, 1);
 }
@@ -1676,7 +1663,7 @@ void canvas_key(t_canvas *x, t_symbol *s, int ac, t_atom *av)
         gotkeysym = av[1].a_w.w_symbol;
     else if (av[1].a_type == A_FLOAT)
     {
-        char buf[3];
+        char buf[UTF8_MAXBYTES1];
         switch((int)(av[1].a_w.w_float))
         {
         case 8:  gotkeysym = gensym("BackSpace"); break;
@@ -1686,7 +1673,8 @@ void canvas_key(t_canvas *x, t_symbol *s, int ac, t_atom *av)
         case 32: gotkeysym = gensym("Space"); break;
         case 127:gotkeysym = gensym("Delete"); break;
         default:
-            sprintf(buf, "%c", (int)(av[1].a_w.w_float));
+        /*-- moo: assume keynum is a Unicode codepoint; encode as UTF-8 --*/
+            u8_wc_toutf8_nul(buf, (UCS4)(av[1].a_w.w_float));
             gotkeysym = gensym(buf);
         }
     }
