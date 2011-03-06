@@ -367,7 +367,7 @@ ANECUA8gwKX3vEiFNOJ9VnkR4YEQwMotA34gzIEIDpPLgrlEAAA7"
             # TODO use 'winico' package for full, hicolor icon support
             wm iconbitmap . -default [file join $::sys_guidir pd.ico]
             # mouse cursors for all the different modes
-            set ::cursor_runmode_nothing "rigth_ptr"
+            set ::cursor_runmode_nothing "right_ptr"
             set ::cursor_runmode_clickme "arrow"
             set ::cursor_runmode_thicken "sb_v_double_arrow"
             set ::cursor_runmode_addpoint "plus"
