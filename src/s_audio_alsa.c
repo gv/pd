@@ -57,10 +57,15 @@ t_alsa_dev alsa_outdev[ALSA_MAXDEV];
 int alsa_nindev;
 int alsa_noutdev;
 
-static void check_error(int err, const char *why)
+static void check_error(int err, const char *why, ...)
 {
-    if (err < 0)
-        fprintf(stderr, "%s: %s\n", why, snd_strerror(err));
+	va_list args;
+	if (err < 0) {
+		va_start(args, why);
+		vfprintf(stderr, why, args);
+		fprintf(stderr, ": %s\n", snd_strerror(err));
+		va_end(args);
+	}
 }
 
 static int alsaio_canmmap(t_alsa_dev *dev)
@@ -265,7 +270,7 @@ int alsa_open_audio(int naudioindev, int *audioindev, int nchindev,
         alsa_numbertoname(audioindev[iodev], devname, 512);
         err = snd_pcm_open(&alsa_indev[alsa_nindev].a_handle, devname,
             SND_PCM_STREAM_CAPTURE, SND_PCM_NONBLOCK);
-        check_error(err, "snd_pcm_open (input)");
+        check_error(err, "snd_pcm_open (%s, input)", devname);
         if (err < 0)
             continue;
         alsa_indev[alsa_nindev].a_devno = audioindev[iodev];
@@ -279,7 +284,7 @@ int alsa_open_audio(int naudioindev, int *audioindev, int nchindev,
         alsa_numbertoname(audiooutdev[iodev], devname, 512);
         err = snd_pcm_open(&alsa_outdev[alsa_noutdev].a_handle, devname,
             SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK);
-        check_error(err, "snd_pcm_open (output)");
+        check_error(err, "snd_pcm_open (%s, output)", devname);
         if (err < 0)
             continue;
         alsa_outdev[alsa_noutdev].a_devno = audiooutdev[iodev];
