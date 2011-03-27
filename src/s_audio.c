@@ -21,7 +21,6 @@
 #include <errno.h>
 
 #define SYS_DEFAULTCH 2
-#define SYS_MAXCH 100
 typedef long t_pa_sample;
 #define SYS_SAMPLEWIDTH sizeof(t_pa_sample)
 #define SYS_BYTESPERCHAN (DEFDACBLKSIZE * SYS_SAMPLEWIDTH) 
@@ -66,7 +65,7 @@ static int audio_naudiooutdev = -1;
 static int audio_audiooutdev[MAXAUDIOOUTDEV];
 static int audio_audiochoutdev[MAXAUDIOOUTDEV];
 static int audio_rate;
-static int audio_advance;
+static int audio_advance = -1;
 static int audio_callback;
 
 static int audio_callback_is_open;  /* reflects true actual state */
@@ -158,8 +157,8 @@ void sys_setchsr(int chin, int chout, int sr)
     sys_outchannels = chout;
     sys_dacsr = sr;
     sys_advance_samples = (sys_schedadvance * sys_dacsr) / (1000000.);
-    if (sys_advance_samples < 3 * DEFDACBLKSIZE)
-        sys_advance_samples = 3 * DEFDACBLKSIZE;
+    if (sys_advance_samples < DEFDACBLKSIZE)
+        sys_advance_samples = DEFDACBLKSIZE;
 
     sys_soundin = (t_sample *)getbytes(inbytes);
     memset(sys_soundin, 0, inbytes);
@@ -197,7 +196,7 @@ void sys_set_audio_settings(int naudioindev, int *audioindev, int nchindev,
 
     if (rate < 1)
         rate = DEFAULTSRATE;
-    if (advance <= 0)
+    if (advance < 0)
         advance = DEFAULTADVANCE;
      audio_init();
         /* Since the channel vector might be longer than the
@@ -405,7 +404,8 @@ void sys_reopen_audio( void)
     if (sys_audioapi == API_PORTAUDIO)
     {
         int blksize = (sys_blocksize ? sys_blocksize : 64);
-        fprintf(stderr, "blksize %d, advance %d\n", blksize, sys_advance_samples/blksize);
+        if (sys_verbose)
+            fprintf(stderr, "blksize %d, advance %d\n", blksize, sys_advance_samples/blksize);
         outcome = pa_open_audio((naudioindev > 0 ? chindev[0] : 0),
         (naudiooutdev > 0 ? choutdev[0] : 0), rate, sys_soundin,
             sys_soundout, blksize, sys_advance_samples/blksize, 

@@ -890,6 +890,8 @@ void alsa_getdevs(char *indevlist, int *nindevs,
             break;
         snprintf(indevlist + j * devdescsize, devdescsize, "%s", 
             alsa_names[i]);
+        snprintf(outdevlist + j * devdescsize, devdescsize, "%s", 
+            alsa_names[i]);
     }
     *nindevs = *noutdevs = j;
 }

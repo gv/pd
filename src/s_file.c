@@ -171,7 +171,7 @@ static int sys_getpreference(const char *key, char *value, int size)
 {
     HKEY hkey;
     DWORD bigsize = size;
-    LONG err = RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+    LONG err = RegOpenKeyEx(HKEY_CURRENT_USER,
         "Software\\Pd", 0,  KEY_QUERY_VALUE, &hkey);
     if (err != ERROR_SUCCESS)
     {
@@ -198,7 +198,7 @@ static void sys_initsavepreferences( void)
 static void sys_putpreference(const char *key, const char *value)
 {
     HKEY hkey;
-    LONG err = RegCreateKeyEx(HKEY_LOCAL_MACHINE,
+    LONG err = RegCreateKeyEx(HKEY_CURRENT_USER,
         "Software\\Pd", 0, NULL, REG_OPTION_NON_VOLATILE, KEY_SET_VALUE,
         NULL, &hkey, NULL);
     if (err != ERROR_SUCCESS)
@@ -291,7 +291,7 @@ void sys_loadpreferences( void)
     int naudiooutdev, audiooutdev[MAXAUDIOOUTDEV], choutdev[MAXAUDIOOUTDEV];
     int nmidiindev, midiindev[MAXMIDIINDEV];
     int nmidioutdev, midioutdev[MAXMIDIOUTDEV];
-    int i, rate = 0, advance = 0, callback = 0, api, nolib, maxi;
+    int i, rate = 0, advance = -1, callback = 0, api, nolib, maxi;
     char prefbuf[MAXPDSTRING], keybuf[80];
 
     sys_initloadpreferences();
