@@ -178,6 +178,9 @@ static int alsaio_setup(t_alsa_dev *dev, int out, int *channels, int *rate,
     err = snd_pcm_hw_params_set_rate_near(dev->a_handle, hw_params, 
         (unsigned int *)rate, 0);
     CHECK_ERROR("snd_pcm_hw_params_set_rate_min");
+		if(sys_verbose)
+			post("ALSA rate set: %d", *rate);
+
 #if 0
     err = snd_pcm_hw_params_get_rate(hw_params, &subunitdir);
     post("input sample rate %d", err);
@@ -194,6 +197,8 @@ static int alsaio_setup(t_alsa_dev *dev, int out, int *channels, int *rate,
         hw_params, &tmp_snd_pcm_uframes, 0);
 #endif
     CHECK_ERROR("snd_pcm_hw_params_set_period_size_near");
+		if(sys_verbose)
+			post("ALSA period size set: %d", tmp_snd_pcm_uframes);
 
         /* set the buffer size */
 #ifdef ALSAAPI9
@@ -205,6 +210,8 @@ static int alsaio_setup(t_alsa_dev *dev, int out, int *channels, int *rate,
         hw_params, &tmp_snd_pcm_uframes);
 #endif
     CHECK_ERROR("snd_pcm_hw_params_set_buffer_size_near");
+		if(sys_verbose)
+			post("ALSA buffer size set: %d", tmp_snd_pcm_uframes);
 
     err = snd_pcm_hw_params(dev->a_handle, hw_params);
     CHECK_ERROR("snd_pcm_hw_params");
