@@ -106,7 +106,7 @@ set TCL_BUGFIX_VERSION 0
 set windowingsystem ""
 
 # args about how much and where to log
-set verbose $::pdwindow::maxverbosity
+set loglevel 2
 set stderr 0
 
 # connection between 'pd' and 'pd-gui'
@@ -437,14 +437,14 @@ proc find_default_font {} {
             break
         }
     }
-    ::pdwindow::verbose 1 "DEFAULT FONT: $::font_family"
+    ::pdwindow::verbose 0 "Default font: $::font_family\n"
 }
 
 proc set_base_font {family weight} {
     if {[lsearch -exact [font families] $family] > -1} {
         set ::font_family $family
     } else {
-        ::pdwindow::warn [format \
+        ::pdwindow::post [format \
             [_ "WARNING: Font family '%s' not found, using default (%s)\n"] \
                 $family $::font_family]
     }
@@ -452,7 +452,7 @@ proc set_base_font {family weight} {
         set ::font_weight $weight
         set using_defaults 0
     } else {
-        ::pdwindow::warn [format \
+        ::pdwindow::post [format \
             [_ "WARNING: Font weight '%s' not found, using default (%s)\n"] \
                 $weight $::font_weight]
     }
@@ -482,7 +482,7 @@ proc fit_font_into_metrics {} {
             "$::font_measured_metrics  $size\
                 [font measure $myfont M] [font metrics $myfont -linespace]"
         if {$giveup} {
-            ::pdwindow::warn [format \
+            ::pdwindow::post [format \
     [_ "WARNING: %s failed to find font size (%s) that fits into %sx%s!\n"]\
                [lindex [info level 0] 0] $size $width $height]
             continue
@@ -540,7 +540,6 @@ proc pdtk_check {mytoplevel message reply_to_pd default} {
 proc parse_args {argc argv} {
     opt_parser::init {
         {-stderr    set {::stderr}}
-        {-verbose   set {::verbose}}
         {-open      lappend {- ::filestoopen_list}}
     }
     set unflagged_files [opt_parser::get_options $argv]
@@ -649,7 +648,7 @@ proc check_for_running_instances {argc argv} {
 proc load_plugin_script {filename} {
     global errorInfo
 
-    ::pdwindow::verbose 1 "Loading plugin: $filename\n"
+    ::pdwindow::debug "Loading plugin: $filename\n"
     set tclfile [open $filename]
     set tclcode [read $tclfile]
     close $tclfile
@@ -700,7 +699,7 @@ proc main {argc argv} {
             set ::fileopendir $::env(HOME)
         }
     }
-    ::pdwindow::verbose 1 "------------------ done with main ----------------------"
+    ::pdwindow::verbose 0 "------------------ done with main ----------------------\n"
 }
 
 main $::argc $::argv

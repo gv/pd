@@ -134,7 +134,7 @@ proc ::pd_menucommands::menu_helpbrowser {} {
 }
 
 proc ::pd_menucommands::menu_texteditor {} {
-    ::pdwindow::warn "the text editor is not implemented"
+    ::pdwindow::error "the text editor is not implemented"
 }
 
 # ------------------------------------------------------------------------------
@@ -173,7 +173,7 @@ proc ::pd_menucommands::menu_raisenextwindow {} {
 # ------------------------------------------------------------------------------
 # Pd window functions
 proc menu_clear_console {} {
-    .pdwindow.text delete 0.0 end
+    ::pdwindow::clear_console
 }
 
 # ------------------------------------------------------------------------------
