@@ -322,12 +322,24 @@ t_int *times_perform(t_int *w)
     return (w+5);
 }
 
-t_int *times_perf8(t_int *w)
-{
+typedef t_sample t_sample_vec __attribute__((vector_size(16)));
+
+t_int *times_perf8(t_int *w){
+
+    int n = (int)(w[4]);
+#if __GNUC__ >= 4
+		t_sample_vec *in1 = (t_sample_vec *)(w[1]);
+		t_sample_vec *in2 = (t_sample_vec *)(w[2]);
+		t_sample_vec *out = (t_sample_vec *)(w[3]);
+    for (; n; n -= 8, in1 += 2, in2 += 2, out += 2)
+    {
+			out[0] = in1[0] * in2[0];
+			out[1] = in1[1] * in2[1];
+		}
+#else
     t_sample *in1 = (t_sample *)(w[1]);
     t_sample *in2 = (t_sample *)(w[2]);
     t_sample *out = (t_sample *)(w[3]);
-    int n = (int)(w[4]);
     for (; n; n -= 8, in1 += 8, in2 += 8, out += 8)
     {
         t_sample f0 = in1[0], f1 = in1[1], f2 = in1[2], f3 = in1[3];
@@ -339,6 +351,7 @@ t_int *times_perf8(t_int *w)
         out[0] = f0 * g0; out[1] = f1 * g1; out[2] = f2 * g2; out[3] = f3 * g3;
         out[4] = f4 * g4; out[5] = f5 * g5; out[6] = f6 * g6; out[7] = f7 * g7;
     }
+#endif
     return (w+5);
 }
 
